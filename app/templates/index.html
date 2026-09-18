@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Finance Advisor Bot — AI Budgeting & Expense Tracker</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Feather Icons -->
+    <script src="https://unpkg.com/feather-icons"></script>
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <!-- App Styling -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="dark-theme">
+
+    <!-- APP WRAPPER -->
+    <div id="app" class="app-layout">
+
+        <!-- SIDEBAR NAVIGATION -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <div class="brand">
+                    <div class="brand-icon">
+                        <i data-feather="cpu"></i>
+                    </div>
+                    <div class="brand-text">
+                        <span class="brand-title">FinanceAI</span>
+                        <span class="brand-subtitle">Advisor Bot</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- USER CARD -->
+            <div id="sidebarUserCard" class="user-profile-card">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <div class="user-info">
+                    <span class="user-name" id="userName">Guest User</span>
+                    <span class="user-badge" id="userBadge">Individual</span>
+                </div>
+                <button class="icon-btn logout-btn" id="logoutBtn" title="Logout" style="display: none;">
+                    <i data-feather="log-out"></i>
+                </button>
+            </div>
+
+            <!-- NAV MENU -->
+            <nav class="sidebar-nav">
+                <a href="#overview" class="nav-item active" data-tab="overview">
+                    <i data-feather="grid"></i>
+                    <span>Overview</span>
+                </a>
+                <a href="#transactions" class="nav-item" data-tab="transactions">
+                    <i data-feather="repeat"></i>
+                    <span>Income & Expenses</span>
+                </a>
+                <a href="#budget" class="nav-item" data-tab="budget">
+                    <i data-feather="pie-chart"></i>
+                    <span>Budget Manager</span>
+                </a>
+                <a href="#savings" class="nav-item" data-tab="savings">
+                    <i data-feather="target"></i>
+                    <span>Savings Goals</span>
+                </a>
+                <a href="#reports" class="nav-item" data-tab="reports">
+                    <i data-feather="file-text"></i>
+                    <span>Monthly Report</span>
+                </a>
+                <a href="#ai-insights" class="nav-item" data-tab="ai-insights">
+                    <i data-feather="message-square"></i>
+                    <span>AI Assistant</span>
+                    <span class="pulse-dot"></span>
+                </a>
+                <a href="#household" class="nav-item" data-tab="household">
+                    <i data-feather="users"></i>
+                    <span>Household</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <button class="btn btn-outline-glow btn-block" id="demoSeedBtn">
+                    <i data-feather="zap"></i> Load Demo Data
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CONTENT AREA -->
+        <main class="main-content">
+
+            <!-- TOPBAR -->
+            <header class="topbar">
+                <div class="topbar-left">
+                    <h1 class="page-title" id="pageTitle">Dashboard Overview</h1>
+                    <span class="text-muted" id="pageSubtitle">Real-time personal cashflow and intelligent budgeting</span>
+                </div>
+                <div class="topbar-right">
+                    <div class="month-selector-wrapper">
+                        <i data-feather="calendar" class="month-icon"></i>
+                        <input type="month" id="globalMonthPicker" class="form-input month-picker">
+                    </div>
+                    <button class="btn btn-primary" id="openAuthModalBtn">
+                        <i data-feather="user"></i> <span id="authBtnText">Sign In / Register</span>
+                    </button>
+                </div>
+            </header>
+
+            <!-- NOTIFICATION / ANNOUNCEMENT BANNER -->
+            <div id="aiBanner" class="ai-banner" style="display: none;">
+                <div class="ai-banner-icon"><i data-feather="sparkles"></i></div>
+                <div class="ai-banner-content" id="aiBannerText">AI Advisor is ready to optimize your monthly financial strategy.</div>
+                <button class="btn-close" onclick="document.getElementById('aiBanner').style.display='none'">&times;</button>
+            </div>
+
+            <!-- TAB CONTENTS -->
+
+            <!-- TAB 1: OVERVIEW DASHBOARD -->
+            <section id="tab-overview" class="tab-page active">
+                <!-- METRICS GRID -->
+                <div class="metrics-grid">
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon income-bg"><i data-feather="arrow-down-left"></i></div>
+                        <div class="metric-details">
+                            <span class="metric-label">Total Monthly Income</span>
+                            <h2 class="metric-value" id="dashTotalIncome">$0.00</h2>
+                            <span class="metric-sub" id="dashIncomeCount">0 sources logged</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon expense-bg"><i data-feather="arrow-up-right"></i></div>
+                        <div class="metric-details">
+                            <span class="metric-label">Total Monthly Expenses</span>
+                            <h2 class="metric-value" id="dashTotalExpenses">$0.00</h2>
+                            <span class="metric-sub" id="dashExpenseCount">0 transactions</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon savings-bg"><i data-feather="shield"></i></div>
+                        <div class="metric-details">
+                            <span class="metric-label">Net Savings Achieved</span>
+                            <h2 class="metric-value" id="dashNetSavings">$0.00</h2>
+                            <span class="metric-sub badge-pill" id="dashSavingsRate">0% Savings Rate</span>
+                        </div>
+                    </div>
+
+                    <div class="metric-card glass-card">
+                        <div class="metric-icon overspend-bg"><i data-feather="alert-circle"></i></div>
+                        <div class="metric-details">
+                            <span class="metric-label">Budget Status</span>
+                            <h2 class="metric-value" id="dashBudgetStatus">On Track</h2>
+                            <span class="metric-sub text-warning" id="dashOverspendNotice">No overspending detected</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CHARTS ROW -->
+                <div class="dashboard-grid">
+                    <div class="glass-card chart-card flex-2">
+                        <div class="card-header">
+                            <h3><i data-feather="activity"></i> Cashflow Trend (Income vs Expenses)</h3>
+                            <span class="card-tag">Monthly Analysis</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="cashflowChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="glass-card chart-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="pie-chart"></i> Category Breakdown</h3>
+                            <span class="card-tag">Spending Split</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="categoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BOTTOM ROW: INSIGHTS & RECENT TRANSACTIONS -->
+                <div class="dashboard-grid">
+                    <!-- AI INSIGHTS CARD -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="cpu"></i> Active AI Recommendations</h3>
+                            <a href="#ai-insights" onclick="switchTab('ai-insights')" class="link-btn">View All AI Chat &rarr;</a>
+                        </div>
+                        <div class="insights-list" id="overviewInsightsList">
+                            <div class="insight-item loading-placeholder">Analyzing financial patterns...</div>
+                        </div>
+                    </div>
+
+                    <!-- RECENT TRANSACTIONS -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="clock"></i> Recent Activity</h3>
+                            <a href="#transactions" onclick="switchTab('transactions')" class="link-btn">Manage All &rarr;</a>
+                        </div>
+                        <div class="table-responsive">
+                            <table class="data-table">
+                                <thead>
+                                    <tr>
+                                        <th>Date</th>
+                                        <th>Description</th>
+                                        <th>Category</th>
+                                        <th>Amount</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="overviewRecentBody">
+                                    <tr><td colspan="4" class="text-center text-muted">No transactions logged for this month yet.</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: TRANSACTIONS (INCOME & EXPENSES) -->
+            <section id="tab-transactions" class="tab-page">
+                <div class="dashboard-grid">
+                    <!-- LOG INCOME FORM -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="plus-circle" class="text-success"></i> Log Income Source</h3>
+                        </div>
+                        <form id="incomeForm" class="form-grid">
+                            <div class="form-group">
+                                <label for="incomeSource">Income Source / Client</label>
+                                <input type="text" id="incomeSource" class="form-input" placeholder="e.g. Salary, Freelance Design, Dividend" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="incomeAmount">Amount ($)</label>
+                                <input type="number" step="0.01" id="incomeAmount" class="form-input" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="incomeDate">Date Received</label>
+                                <input type="date" id="incomeDate" class="form-input" required>
+                            </div>
+                            <div class="form-group check-group">
+                                <label class="checkbox-label">
+                                    <input type="checkbox" id="incomeRecurring">
+                                    <span>Is Recurring Monthly Income?</span>
+                                </label>
+                            </div>
+                            <div class="form-group full-width">
+                                <label for="incomeNote">Optional Notes</label>
+                                <input type="text" id="incomeNote" class="form-input" placeholder="Client contract #, invoice link, etc.">
+                            </div>
+                            <button type="submit" class="btn btn-success full-width">
+                                <i data-feather="plus"></i> Add Income Record
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- LOG EXPENSE FORM -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="minus-circle" class="text-danger"></i> Log Expense</h3>
+                        </div>
+                        <form id="expenseForm" class="form-grid">
+                            <div class="form-group">
+                                <label for="expenseCategory">Spending Category</label>
+                                <select id="expenseCategory" class="form-input" required>
+                                    <option value="">Select Category...</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label for="expenseAmount">Amount ($)</label>
+                                <input type="number" step="0.01" id="expenseAmount" class="form-input" placeholder="0.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="expenseDate">Expense Date</label>
+                                <input type="date" id="expenseDate" class="form-input" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="expenseNote">Notes / Merchant</label>
+                                <input type="text" id="expenseNote" class="form-input" placeholder="e.g. Whole Foods, Spotify, Rent">
+                            </div>
+                            <button type="submit" class="btn btn-danger full-width">
+                                <i data-feather="minus"></i> Add Expense Record
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- TRANSACTIONS LIST -->
+                <div class="glass-card margin-top">
+                    <div class="card-header">
+                        <h3><i data-feather="list"></i> Financial Records Table</h3>
+                        <div class="filter-bar">
+                            <input type="text" id="txSearch" class="form-input search-input" placeholder="Search transactions...">
+                            <select id="txTypeFilter" class="form-input">
+                                <option value="all">All Types</option>
+                                <option value="income">Income Only</option>
+                                <option value="expense">Expenses Only</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Type</th>
+                                    <th>Date</th>
+                                    <th>Description / Source</th>
+                                    <th>Category</th>
+                                    <th>Amount</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="txTableBody">
+                                <tr><td colspan="6" class="text-center text-muted">Loading transactions...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: BUDGET MANAGER -->
+            <section id="tab-budget" class="tab-page">
+                <div class="glass-card banner-card accent-border">
+                    <div class="banner-content">
+                        <h2><i data-feather="cpu"></i> AI-Powered Budget Generator</h2>
+                        <p id="budgetAccountAdvice">Our algorithm applies the 50/30/20 budget framework tailored to your account type. For freelancers, income is auto-smoothed using a 3-month rolling average to absorb low-earning months.</p>
+                        <div class="banner-actions">
+                            <button class="btn btn-primary btn-lg" id="generateAiBudgetBtn">
+                                <i data-feather="sparkles"></i> Auto-Generate AI Monthly Budget
+                            </button>
+                            <span class="text-muted" id="budgetSmoothingTag"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BUDGET SUMMARY METRICS -->
+                <div class="metrics-grid margin-top">
+                    <div class="metric-card glass-card">
+                        <div class="metric-details">
+                            <span class="metric-label">Total Budget Target</span>
+                            <h3 class="metric-value" id="budgetTotalTarget">$0.00</h3>
+                        </div>
+                    </div>
+                    <div class="metric-card glass-card">
+                        <div class="metric-details">
+                            <span class="metric-label">Total Actual Spent</span>
+                            <h3 class="metric-value" id="budgetTotalActual">$0.00</h3>
+                        </div>
+                    </div>
+                    <div class="metric-card glass-card">
+                        <div class="metric-details">
+                            <span class="metric-label">Budget Variance</span>
+                            <h3 class="metric-value" id="budgetVariance">$0.00</h3>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- BUDGET CATEGORIES GRID -->
+                <div class="glass-card margin-top">
+                    <div class="card-header">
+                        <h3><i data-feather="sliders"></i> Category Budget Limits vs Actual Expenses</h3>
+                    </div>
+                    <div class="budget-list" id="budgetCategoriesList">
+                        <div class="text-center text-muted padding-20">Click 'Auto-Generate AI Monthly Budget' to calculate your optimal limits.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 4: SAVINGS GOALS -->
+            <section id="tab-savings" class="tab-page">
+                <div class="dashboard-grid">
+                    <!-- NEW SAVINGS GOAL FORM -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="plus-circle"></i> Create New Savings Goal</h3>
+                        </div>
+                        <form id="savingsGoalForm" class="form-grid">
+                            <div class="form-group">
+                                <label for="goalName">Goal Name</label>
+                                <input type="text" id="goalName" class="form-input" placeholder="e.g. Emergency Fund, Laptop Upgrade, Vacation" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="targetAmount">Target Amount ($)</label>
+                                <input type="number" step="0.01" id="targetAmount" class="form-input" placeholder="5000.00" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="initialDeposit">Starting Amount / Saved ($)</label>
+                                <input type="number" step="0.01" id="initialDeposit" class="form-input" placeholder="0.00" value="0.00">
+                            </div>
+                            <div class="form-group">
+                                <label for="targetDate">Target Completion Date</label>
+                                <input type="date" id="targetDate" class="form-input">
+                            </div>
+                            <button type="submit" class="btn btn-primary full-width">
+                                <i data-feather="target"></i> Add Savings Goal
+                            </button>
+                        </form>
+                    </div>
+
+                    <!-- SAVINGS SUMMARY STATS -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="award"></i> Savings Milestones</h3>
+                        </div>
+                        <div class="savings-summary-box">
+                            <div class="savings-stat">
+                                <span class="stat-label">Total Savings Target</span>
+                                <h2 class="stat-value" id="savingsTotalTarget">$0.00</h2>
+                            </div>
+                            <div class="savings-stat">
+                                <span class="stat-label">Current Total Saved</span>
+                                <h2 class="stat-value text-success" id="savingsTotalSaved">$0.00</h2>
+                            </div>
+                            <div class="progress-bar-container">
+                                <div class="progress-bar-fill success-fill" id="savingsOverallBar" style="width: 0%;"></div>
+                            </div>
+                            <span class="text-muted" id="savingsOverallPct">0% overall goal progress</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- GOALS CARDS GRID -->
+                <div class="margin-top">
+                    <h3 class="section-title"><i data-feather="target"></i> Active Goals</h3>
+                    <div class="goals-grid" id="goalsGrid">
+                        <div class="glass-card text-center text-muted padding-20">No savings goals created yet.</div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: MONTHLY REPORT -->
+            <section id="tab-reports" class="tab-page">
+                <div class="report-controls no-print">
+                    <button class="btn btn-primary" onclick="window.print()">
+                        <i data-feather="printer"></i> Print / Save Report PDF
+                    </button>
+                </div>
+
+                <div class="printable-report glass-card margin-top" id="printableReport">
+                    <div class="report-header">
+                        <div class="report-brand">
+                            <h2>PERSONAL FINANCE ADVISOR BOT</h2>
+                            <p>Monthly Executive Cashflow & Strategy Report</p>
+                        </div>
+                        <div class="report-meta">
+                            <h3 id="reportMonthTitle">Month: YYYY-MM</h3>
+                            <p>Prepared for: <strong id="reportUserName">User Name</strong></p>
+                            <span class="badge-pill" id="reportAccountType">Individual</span>
+                        </div>
+                    </div>
+
+                    <div class="report-section">
+                        <h4>1. Monthly Cashflow Summary</h4>
+                        <table class="report-summary-table">
+                            <tr>
+                                <td>Total Monthly Income:</td>
+                                <td class="text-right text-success"><strong id="repIncome">$0.00</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Total Monthly Expenses:</td>
+                                <td class="text-right text-danger"><strong id="repExpenses">$0.00</strong></td>
+                            </tr>
+                            <tr class="highlight-row">
+                                <td>Net Monthly Savings Achieved:</td>
+                                <td class="text-right"><strong id="repSavings">$0.00</strong></td>
+                            </tr>
+                            <tr>
+                                <td>Net Savings Rate:</td>
+                                <td class="text-right"><strong id="repSavingsRate">0%</strong></td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <div class="report-section">
+                        <h4>2. Category Spending Breakdown</h4>
+                        <table class="data-table report-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th class="text-right">Amount Spent</th>
+                                    <th class="text-right">% of Total Expenses</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repCategoryBody">
+                                <tr><td colspan="3" class="text-center text-muted">No expenses recorded.</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="report-section">
+                        <h4>3. AI Advisor Strategic Insights & Next Month Recommendations</h4>
+                        <div class="insights-list" id="repInsightsList">
+                            <div class="insight-item">Generating AI Insights...</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: AI ASSISTANT -->
+            <section id="tab-ai-insights" class="tab-page">
+                <div class="dashboard-grid">
+                    <!-- AI INSIGHT CARDS -->
+                    <div class="glass-card flex-1">
+                        <div class="card-header">
+                            <h3><i data-feather="cpu"></i> Automated Spending Diagnostics</h3>
+                        </div>
+                        <div class="insights-list" id="aiDiagnosticsList">
+                            <div class="insight-item">Analyzing your financial records...</div>
+                        </div>
+                    </div>
+
+                    <!-- AI INTERACTIVE CHAT BOT -->
+                    <div class="glass-card flex-1 chat-card">
+                        <div class="card-header">
+                            <h3><i data-feather="message-circle"></i> AI Financial Advisor Chat</h3>
+                            <span class="online-indicator"><span class="dot"></span> Online</span>
+                        </div>
+                        <div class="chat-messages" id="chatMessages">
+                            <div class="chat-bubble bot-bubble">
+                                <div class="bubble-header"><i data-feather="cpu"></i> Advisor Bot</div>
+                                <div class="bubble-content">
+                                    Hello! I am your AI Personal Finance Advisor. Ask me anything about your cashflow, savings strategies, freelancer smoothing, or budget optimization!
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- QUICK PROMPT CHIPS -->
+                        <div class="chat-chips">
+                            <button class="chip" onclick="sendQuickPrompt('How can I increase my monthly savings?')">💡 How can I save more?</button>
+                            <button class="chip" onclick="sendQuickPrompt('Am I overspending in any category?')">⚠️ Check my overspending</button>
+                            <button class="chip" onclick="sendQuickPrompt('Explain my budget for freelancer income')">💼 Freelancer tips</button>
+                        </div>
+
+                        <form id="chatForm" class="chat-input-row">
+                            <input type="text" id="chatPrompt" class="form-input" placeholder="Type your financial question..." required>
+                            <button type="submit" class="btn btn-primary"><i data-feather="send"></i></button>
+                        </form>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 7: HOUSEHOLD SHARING -->
+            <section id="tab-household" class="tab-page">
+                <div id="householdJoinCreateBox" class="glass-card banner-card">
+                    <div class="banner-content">
+                        <h2><i data-feather="users"></i> Consolidated Household Budgeting</h2>
+                        <p>Share income & expense logging with your partner, family, or roommates. View combined metrics and joint category allocations!</p>
+                        <div class="dashboard-grid margin-top">
+                            <div class="glass-card flex-1">
+                                <h3>Create a Household</h3>
+                                <form id="createHouseholdForm" class="form-grid margin-top">
+                                    <div class="form-group">
+                                        <label for="newHouseholdName">Household Name</label>
+                                        <input type="text" id="newHouseholdName" class="form-input" placeholder="e.g. Rivers Family Household" required>
+                                    </div>
+                                    <button type="submit" class="btn btn-primary"><i data-feather="plus"></i> Create Household</button>
+                                </form>
+                            </div>
+
+                            <div class="glass-card flex-1">
+                                <h3>Join Existing Household</h3>
+                                <form id="joinHouseholdForm" class="form-grid margin-top">
+                                    <div class="form-group">
+                                        <label for="joinInviteCode">6-Character Invite Code</label>
+                                        <input type="text" id="joinInviteCode" class="form-input" placeholder="e.g. X9K2P4" required style="text-transform: uppercase;">
+                                    </div>
+                                    <button type="submit" class="btn btn-outline-glow"><i data-feather="user-plus"></i> Join Household</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HOUSEHOLD ACTIVE VIEW -->
+                <div id="householdActiveView" class="glass-card margin-top" style="display: none;">
+                    <div class="card-header">
+                        <div>
+                            <h2 id="householdTitle">Household Name</h2>
+                            <span class="text-muted">Invite Code: <strong id="householdInviteCodeDisplay" class="text-success">------</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="metrics-grid margin-top">
+                        <div class="metric-card glass-card">
+                            <div class="metric-details">
+                                <span class="metric-label">Joint Household Income</span>
+                                <h2 class="metric-value text-success" id="hhTotalIncome">$0.00</h2>
+                            </div>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <div class="metric-details">
+                                <span class="metric-label">Joint Household Expenses</span>
+                                <h2 class="metric-value text-danger" id="hhTotalExpenses">$0.00</h2>
+                            </div>
+                        </div>
+                        <div class="metric-card glass-card">
+                            <div class="metric-details">
+                                <span class="metric-label">Joint Net Savings</span>
+                                <h2 class="metric-value" id="hhTotalSavings">$0.00</h2>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="margin-top">
+                        <h3>Household Members Breakdown</h3>
+                        <div class="goals-grid margin-top" id="hhMembersGrid">
+                            <!-- Member cards -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- AUTH MODAL -->
+    <div id="authModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card glass-card">
+            <button class="modal-close" id="closeAuthModalBtn">&times;</button>
+            
+            <div class="auth-tabs">
+                <button class="auth-tab active" id="tabLoginBtn" onclick="toggleAuthForm('login')">Sign In</button>
+                <button class="auth-tab" id="tabSignupBtn" onclick="toggleAuthForm('signup')">Create Account</button>
+            </div>
+
+            <!-- LOGIN FORM -->
+            <form id="loginForm" class="form-grid auth-form">
+                <div class="form-group full-width">
+                    <label for="loginEmail">Email Address</label>
+                    <input type="email" id="loginEmail" class="form-input" placeholder="name@example.com" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="loginPassword">Password</label>
+                    <input type="password" id="loginPassword" class="form-input" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary full-width margin-top">Sign In</button>
+            </form>
+
+            <!-- SIGNUP FORM -->
+            <form id="signupForm" class="form-grid auth-form" style="display: none;">
+                <div class="form-group full-width">
+                    <label for="signupName">Full Name</label>
+                    <input type="text" id="signupName" class="form-input" placeholder="Alex Rivers" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="signupEmail">Email Address</label>
+                    <input type="email" id="signupEmail" class="form-input" placeholder="alex@example.com" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="signupPassword">Password</label>
+                    <input type="password" id="signupPassword" class="form-input" placeholder="Create password" required>
+                </div>
+                <div class="form-group full-width">
+                    <label for="accountType">Account Type Profile</label>
+                    <select id="accountType" class="form-input">
+                        <option value="individual">Individual Professional</option>
+                        <option value="freelancer">Freelancer / Variable Income (Auto-Smoothed)</option>
+                        <option value="student">Student Account</option>
+                        <option value="household">Household Account</option>
+                    </select>
+                </div>
+                <div class="form-group full-width">
+                    <label for="signupInviteCode">Household Invite Code (Optional)</label>
+                    <input type="text" id="signupInviteCode" class="form-input" placeholder="e.g. X9K2P4">
+                </div>
+                <button type="submit" class="btn btn-success full-width margin-top">Create Account</button>
+            </form>
+
+            <div class="auth-footer text-center margin-top">
+                <p class="text-muted">Want to preview with sample data?</p>
+                <button class="btn btn-outline-glow btn-sm margin-top" onclick="triggerDemoSeed()">
+                    ⚡ Instant Demo Login
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- DEPOSIT MODAL FOR SAVINGS GOALS -->
+    <div id="depositModal" class="modal-overlay" style="display: none;">
+        <div class="modal-card glass-card">
+            <button class="modal-close" onclick="closeDepositModal()">&times;</button>
+            <h3><i data-feather="plus-circle" class="text-success"></i> Add Deposit to Goal</h3>
+            <p id="depositGoalName" class="text-muted margin-top">Goal Name</p>
+            <form id="depositForm" class="form-grid margin-top">
+                <input type="hidden" id="depositGoalId">
+                <div class="form-group full-width">
+                    <label for="depositAmount">Deposit Amount ($)</label>
+                    <input type="number" step="0.01" id="depositAmount" class="form-input" placeholder="100.00" required>
+                </div>
+                <button type="submit" class="btn btn-success full-width margin-top">Confirm Deposit</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- JS Application File -->
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+    <script>
+        feather.replace();
+    </script>
+</body>
+</html>
