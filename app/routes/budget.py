@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 from flask import Blueprint, request, jsonify
 from flask_login import login_required, current_user
 from sqlalchemy import extract
@@ -45,7 +45,7 @@ def get_budget(month):
         total_budgeted += limit
         total_actual += spent
 
-        pct = (spent / limit * 100) if limit > 0 else 0
+        pct = (spent / limit * 100) if limit > 0 else (100.0 if spent > 0 else 0.0)
         is_over = spent > limit if limit > 0 else (spent > 0)
 
         result.append({
@@ -73,6 +73,11 @@ def get_budget(month):
 def generate_budget():
     data = request.get_json() or {}
     month = data.get('month', date.today().strftime('%Y-%m'))
+
+    try:
+        datetime.strptime(month, '%Y-%m')
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid month format (use YYYY-MM)'}), 400
 
     recommendation = AIAdvisorService.generate_recommended_budget(current_user, month)
 
@@ -115,6 +120,15 @@ def set_budget():
 
     if not category_id or not month or limit_amount is None:
         return jsonify({'error': 'Category, month, and limit amount are required'}), 400
+
+    category = db.session.get(Category, category_id)
+    if not category:
+        return jsonify({'error': 'Invalid category ID'}), 400
+
+    try:
+        datetime.strptime(month, '%Y-%m')
+    except (ValueError, TypeError):
+        return jsonify({'error': 'Invalid month format (use YYYY-MM)'}), 400
 
     try:
         limit_amount = float(limit_amount)

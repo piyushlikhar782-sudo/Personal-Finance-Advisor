@@ -86,7 +86,6 @@ class AIAdvisorService:
         discretionary_cats = [c for c in categories if c.type == 'discretionary']
 
         # Historical spending distribution for weighting
-        year, month = map(int, target_month.split('-'))
         historical_expenses = Expense.query.filter(Expense.user_id == user.id).all()
         
         cat_hist_totals = {}
@@ -202,6 +201,15 @@ class AIAdvisorService:
                         'overspend_pct': round(pct, 1),
                         'excess_amount': round(spent - budget_limit, 2)
                     })
+            elif spent > 25.0 and budget_map: # Unbudgeted spending when budgets exist
+                overspend_flags.append({
+                    'category_name': cat.name,
+                    'category_type': cat.type,
+                    'spent': round(spent, 2),
+                    'limit': 0.0,
+                    'overspend_pct': 100.0,
+                    'excess_amount': round(spent, 2)
+                })
 
         # Sort overspending flags by severity
         overspend_flags.sort(key=lambda x: x['overspend_pct'], reverse=True)
@@ -209,18 +217,32 @@ class AIAdvisorService:
         # Generate Actionable Recommendations
         if overspend_flags:
             top_over = overspend_flags[0]
-            insights.append({
-                'type': 'warning',
-                'title': f"High Overspending in {top_over['category_name']}",
-                'message': f"You spent ${top_over['spent']:.2f}, which is {top_over['overspend_pct']}% over your budget of ${top_over['limit']:.2f}. Capping this category could save you ${top_over['excess_amount']:.2f} next month."
-            })
+            if top_over['limit'] > 0:
+                insights.append({
+                    'type': 'warning',
+                    'title': f"High Overspending in {top_over['category_name']}",
+                    'message': f"You spent ${top_over['spent']:.2f}, which is {top_over['overspend_pct']}% over your budget of ${top_over['limit']:.2f}. Capping this category could save you ${top_over['excess_amount']:.2f} next month."
+                })
+            else:
+                insights.append({
+                    'type': 'warning',
+                    'title': f"Unbudgeted Spending in {top_over['category_name']}",
+                    'message': f"You spent ${top_over['spent']:.2f} in {top_over['category_name']} without setting a budget limit for it."
+                })
             if len(overspend_flags) > 1:
                 second = overspend_flags[1]
-                insights.append({
-                    'type': 'info',
-                    'title': f"Watch Out: {second['category_name']}",
-                    'message': f"You're currently {second['overspend_pct']}% above target limit (${second['spent']:.2f} vs ${second['limit']:.2f})."
-                })
+                if second['limit'] > 0:
+                    insights.append({
+                        'type': 'info',
+                        'title': f"Watch Out: {second['category_name']}",
+                        'message': f"You're currently {second['overspend_pct']}% above target limit (${second['spent']:.2f} vs ${second['limit']:.2f})."
+                    })
+                else:
+                    insights.append({
+                        'type': 'info',
+                        'title': f"Watch Out: {second['category_name']}",
+                        'message': f"Unbudgeted spending of ${second['spent']:.2f} detected."
+                    })
 
         # Savings Rate Insight
         savings_rate = (total_savings / total_income * 100) if total_income > 0 else 0
@@ -229,6 +251,12 @@ class AIAdvisorService:
                 'type': 'success',
                 'title': 'Great Savings Momentum!',
                 'message': f"Your savings rate is {savings_rate:.1f}% this month (${total_savings:.2f}), exceeding the 20% benchmark!"
+            })
+        elif total_savings < 0:
+            insights.append({
+                'type': 'warning',
+                'title': 'Monthly Cashflow Deficit',
+                'message': f"You spent more than your total income this month (Net deficit of ${abs(total_savings):.2f}). Try cutting non-essential discretionary spending."
             })
         elif total_income > 0 and savings_rate < 10:
             insights.append({

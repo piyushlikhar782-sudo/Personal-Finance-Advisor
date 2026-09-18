@@ -128,5 +128,68 @@ class FinanceAdvisorTestCase(unittest.TestCase):
         goal_data = json.loads(res_d.data)['goal']
         self.assertEqual(goal_data['current_amount'], 1500.0)
 
+    def test_invalid_invite_code_signup(self):
+        res = self.client.post('/api/auth/signup', json={
+            'name': 'Invalid Code User',
+            'email': 'invalidcode@example.com',
+            'password': 'password123',
+            'invite_code': 'BADCODE999'
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(json.loads(res.data)['error'], 'Invalid household invite code')
+
+    def test_budget_validations(self):
+        self.client.post('/api/auth/signup', json={
+            'name': 'Budget Validator',
+            'email': 'validator@example.com',
+            'password': 'password123'
+        })
+        # Invalid category ID
+        res = self.client.post('/api/budget', json={
+            'category_id': 99999,
+            'month': '2026-09',
+            'limit_amount': 500.0
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(json.loads(res.data)['error'], 'Invalid category ID')
+
+        # Invalid month format
+        res = self.client.post('/api/budget', json={
+            'category_id': 1,
+            'month': 'invalid-month',
+            'limit_amount': 500.0
+        })
+        self.assertEqual(res.status_code, 400)
+        self.assertEqual(json.loads(res.data)['error'], 'Invalid month format (use YYYY-MM)')
+
+    def test_ai_deficit_insight(self):
+        self.client.post('/api/auth/signup', json={
+            'name': 'Deficit User',
+            'email': 'deficit@example.com',
+            'password': 'password123'
+        })
+
+        # Income 100, Expense 500 (Deficit of 400)
+        self.client.post('/api/income', json={
+            'source': 'Side Gig',
+            'amount': 100.0,
+            'date_received': date.today().strftime('%Y-%m-%d')
+        })
+        res_cat = self.client.get('/api/categories')
+        cat_id = json.loads(res_cat.data)['categories'][0]['id']
+
+        self.client.post('/api/expenses', json={
+            'category_id': cat_id,
+            'amount': 500.0,
+            'date': date.today().strftime('%Y-%m-%d')
+        })
+
+        res_ai = self.client.get(f"/api/ai/insights?month={date.today().strftime('%Y-%m')}")
+        self.assertEqual(res_ai.status_code, 200)
+        insights = json.loads(res_ai.data)['insights']
+        deficit_insight = next((i for i in insights if i['title'] == 'Monthly Cashflow Deficit'), None)
+        self.assertIsNotNone(deficit_insight)
+        self.assertIn('Net deficit of $400.00', deficit_insight['message'])
+
 if __name__ == '__main__':
     unittest.main()

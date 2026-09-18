@@ -5,6 +5,7 @@
 let currentUser = null;
 let currentMonth = new Date().toISOString().slice(0, 7); // YYYY-MM
 let categories = [];
+let allTransactions = [];
 let cashflowChartInstance = null;
 let categoryChartInstance = null;
 
@@ -38,6 +39,10 @@ async function initApp() {
     // Setup Forms
     setupFormListeners();
 
+    // Setup Transaction Search and Filter listeners
+    document.getElementById('txSearch')?.addEventListener('input', filterTransactions);
+    document.getElementById('txTypeFilter')?.addEventListener('change', filterTransactions);
+
     // Load Categories
     await fetchCategories();
 
@@ -56,7 +61,7 @@ function switchTab(tabName) {
     if (navLink) navLink.classList.add('active');
     if (tabPage) tabPage.classList.add('active');
 
-    // Update Topbar Title
+    // Update Topbar Title & Subtitle
     const titleMap = {
         'overview': 'Dashboard Overview',
         'transactions': 'Income & Expense Logging',
@@ -66,7 +71,18 @@ function switchTab(tabName) {
         'ai-insights': 'AI Financial Assistant',
         'household': 'Household Budget Sharing'
     };
+    const subMap = {
+        'overview': 'Real-time personal cashflow and intelligent budgeting',
+        'transactions': 'Log and filter monthly income sources and expenses',
+        'budget': 'AI-calculated category spending limits and variances',
+        'savings': 'Track financial milestones and progress',
+        'reports': 'Printable executive monthly financial summary',
+        'ai-insights': 'Automated spending diagnostics and AI financial counselor',
+        'household': 'Shared multi-user budget management'
+    };
     document.getElementById('pageTitle').textContent = titleMap[tabName] || 'Dashboard';
+    const subEl = document.getElementById('pageSubtitle');
+    if (subEl) subEl.textContent = subMap[tabName] || '';
 
     // Reload tab data
     loadTabData(tabName);
@@ -492,18 +508,40 @@ async function loadOverview() {
         document.getElementById('dashNetSavings').textContent = `$${netSavings.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
         document.getElementById('dashSavingsRate').textContent = `${savingsRate}% Savings Rate`;
 
-        // Overspend Status
+        // Overspend Status & AI Banner
         const statusEl = document.getElementById('dashBudgetStatus');
         const noticeEl = document.getElementById('dashOverspendNotice');
+        const aiBanner = document.getElementById('aiBanner');
+        const aiBannerText = document.getElementById('aiBannerText');
+
         if (aiData.overspend_flags && aiData.overspend_flags.length > 0) {
             const topOver = aiData.overspend_flags[0];
             statusEl.textContent = 'Attention Needed';
             statusEl.className = 'metric-value text-warning';
             noticeEl.textContent = `${topOver.category_name} is ${topOver.overspend_pct}% over budget`;
+
+            if (aiBanner && aiBannerText) {
+                aiBannerText.textContent = `⚠️ Overspend Alert: ${topOver.category_name} is ${topOver.overspend_pct}% over budget limit!`;
+                aiBanner.style.display = 'flex';
+            }
         } else {
             statusEl.textContent = 'On Track';
             statusEl.className = 'metric-value text-success';
             noticeEl.textContent = 'All categories within target limit';
+
+            if (aiBanner && aiBannerText) {
+                if (currentUser && currentUser.account_type === 'freelancer' && aiData.insights) {
+                    const freeInsight = aiData.insights.find(i => i.title.includes('Freelancer'));
+                    if (freeInsight) {
+                        aiBannerText.textContent = `💼 ${freeInsight.title}: ${freeInsight.message}`;
+                        aiBanner.style.display = 'flex';
+                    } else {
+                        aiBanner.style.display = 'none';
+                    }
+                } else {
+                    aiBanner.style.display = 'none';
+                }
+            }
         }
 
         // Render Overview Insights
@@ -521,8 +559,8 @@ async function loadOverview() {
     }
 }
 
-function renderOverviewInsights(insights) {
-    const list = document.getElementById('overviewInsightsList');
+function renderOverviewInsights(insights, targetId = 'overviewInsightsList') {
+    const list = document.getElementById(targetId);
     if (!list) return;
     list.innerHTML = '';
 
@@ -531,7 +569,7 @@ function renderOverviewInsights(insights) {
         return;
     }
 
-    insights.slice(0, 3).forEach(item => {
+    insights.slice(0, 5).forEach(item => {
         const div = document.createElement('div');
         div.className = `insight-item ${item.type || 'info'}`;
         div.innerHTML = `
@@ -679,10 +717,28 @@ async function loadTransactions() {
         // Sort by date desc
         allRecords.sort((a, b) => new Date(b.date_received || b.date) - new Date(a.date_received || a.date));
 
-        renderTransactionsTable(allRecords);
+        allTransactions = allRecords;
+        filterTransactions();
     } catch (err) {
         console.error('Error loading transactions:', err);
     }
+}
+
+function filterTransactions() {
+    const query = (document.getElementById('txSearch')?.value || '').toLowerCase().trim();
+    const typeFilter = document.getElementById('txTypeFilter')?.value || 'all';
+
+    const filtered = allTransactions.filter(r => {
+        if (typeFilter !== 'all' && r.record_type !== typeFilter) return false;
+        if (!query) return true;
+        const desc = (r.source || r.note || r.category_name || '').toLowerCase();
+        const cat = (r.category_name || '').toLowerCase();
+        const dateVal = (r.date_received || r.date || '').toLowerCase();
+        const amt = (r.amount || '').toString();
+        return desc.includes(query) || cat.includes(query) || dateVal.includes(query) || amt.includes(query);
+    });
+
+    renderTransactionsTable(filtered);
 }
 
 function renderTransactionsTable(records) {
@@ -691,7 +747,7 @@ function renderTransactionsTable(records) {
     tbody.innerHTML = '';
 
     if (records.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No income or expense records logged for this month.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted">No income or expense records match your search or filter.</td></tr>';
         return;
     }
 
@@ -748,6 +804,24 @@ async function loadBudgetManager() {
         const varAmt = (data.total_budgeted || 0) - (data.total_actual || 0);
         document.getElementById('budgetVariance').textContent = `$${varAmt.toFixed(2)}`;
         document.getElementById('budgetVariance').className = varAmt >= 0 ? 'metric-value text-success' : 'metric-value text-danger';
+
+        // Update Account-Specific Advice
+        const advEl = document.getElementById('budgetAccountAdvice');
+        const tagEl = document.getElementById('budgetSmoothingTag');
+        if (advEl && currentUser) {
+            if (currentUser.account_type === 'freelancer') {
+                advEl.textContent = "Freelancer Profile Active: Income is auto-smoothed using a 3-month rolling average to absorb low-earning months and maintain stable budget targets.";
+            } else if (currentUser.account_type === 'student') {
+                advEl.textContent = "Student Profile Active: Allocations prioritize essential housing and course materials (60% Essential, 25% Discretionary, 15% Savings).";
+            } else if (currentUser.account_type === 'household') {
+                advEl.textContent = "Household Profile Active: Category limits are calculated for joint family spending.";
+            } else {
+                advEl.textContent = "Individual Profile Active: Built-in 50/30/20 budgeting rule (50% Essential, 30% Discretionary, 20% Savings).";
+            }
+        }
+        if (tagEl) {
+            tagEl.textContent = (currentUser && currentUser.account_type === 'freelancer') ? '⚡ 3-Month Rolling Average Smoothing Active' : '';
+        }
 
         renderBudgetCategories(data.budgets || []);
     } catch (err) {
@@ -903,7 +977,7 @@ async function loadMonthlyReport() {
         }
 
         // Insights List
-        renderOverviewInsights(data.insights || []);
+        renderOverviewInsights(data.insights || [], 'repInsightsList');
     } catch (err) {
         console.error('Error loading report:', err);
     }

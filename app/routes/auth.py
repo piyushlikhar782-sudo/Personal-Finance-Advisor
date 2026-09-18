@@ -26,6 +26,8 @@ def signup():
         if household:
             household_id = household.id
             account_type = 'household'
+        else:
+            return jsonify({'error': 'Invalid household invite code'}), 400
 
     user = User(
         name=name,
